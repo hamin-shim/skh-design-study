@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0f172a">
+<title>설계 면접 노트</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="marked.min.js"></script>
+<style>
+:root{--bg:#f7f7f5;--card:#fff;--fg:#1c1c1e;--mute:#6b6b70;--line:#e4e4e0;--acc:#c2410c;--acc-soft:#fff1e8;--code:#f1f1ee;--fs:16px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111214;--card:#1a1b1e;--fg:#ececec;--mute:#9a9aa0;--line:#2c2d31;--acc:#fb923c;--acc-soft:#2a1d14;--code:#24252a}}
+:root[data-theme="dark"]{--bg:#111214;--card:#1a1b1e;--fg:#ececec;--mute:#9a9aa0;--line:#2c2d31;--acc:#fb923c;--acc-soft:#2a1d14;--code:#24252a}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:400 var(--fs)/1.7 "Noto Sans KR",system-ui,sans-serif}
+a{color:var(--acc)}
+header{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.bar{max-width:760px;margin:0 auto;padding:10px 16px;display:flex;gap:8px;align-items:center}
+.bar h1{font-size:17px;margin:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+button,select,input{font:inherit;font-size:14px;color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px 10px}
+button{cursor:pointer}
+.tools{max-width:760px;margin:0 auto;padding:0 16px 10px;display:none;gap:8px}
+.tools.on{display:flex}
+.tools select{flex:1;min-width:0}
+.tools input{width:38%}
+main{max-width:760px;margin:0 auto;padding:16px 16px 80px}
+.sec{margin:22px 0 8px;font-size:13px;font-weight:700;color:var(--mute);letter-spacing:.04em}
+.card{display:block;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:8px 0;text-decoration:none;color:var(--fg)}
+.card b{display:block;font-size:16px}
+.card span{font-size:13px;color:var(--mute)}
+.card .tag{float:right;font-size:12px;color:var(--acc);background:var(--acc-soft);border-radius:999px;padding:1px 8px}
+.week label{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line);font-size:15px;line-height:1.55}
+.week label:first-of-type{border-top:0}
+.week input{margin-top:5px;accent-color:var(--acc);width:18px;height:18px;flex:none}
+.week .d{font-weight:700;color:var(--acc);margin-right:4px}
+.week label.done .t{color:var(--mute);text-decoration:line-through}
+.doc{word-break:keep-all;overflow-wrap:anywhere}
+.doc h1{font-size:1.45em;line-height:1.35}
+.doc h2{font-size:1.25em;margin-top:2em;padding-top:.6em;border-top:2px solid var(--line)}
+.doc h3{font-size:1.08em;margin-top:1.8em;color:var(--acc)}
+.doc h2,.doc h3{scroll-margin-top:110px}
+.doc table{display:block;overflow-x:auto;border-collapse:collapse;font-size:.9em;margin:1em 0}
+.doc th,.doc td{border:1px solid var(--line);padding:6px 8px;vertical-align:top;min-width:90px}
+.doc th{background:var(--code)}
+.doc code{background:var(--code);border-radius:5px;padding:1px 5px;font-size:.9em}
+.doc pre{background:var(--code);padding:12px;border-radius:10px;overflow-x:auto;font-size:.85em}
+.doc pre code{padding:0}
+.doc blockquote{margin:1em 0;padding:8px 14px;border-left:4px solid var(--acc);background:var(--acc-soft);border-radius:0 10px 10px 0}
+.doc mark{background:#fde047;color:#111}
+.doc img{max-width:100%}
+#top{position:fixed;right:16px;bottom:20px;border-radius:999px;width:44px;height:44px;padding:0;box-shadow:0 2px 10px rgba(0,0,0,.15);display:none}
+.foot{font-size:12px;color:var(--mute);margin-top:30px}
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <button id="home" aria-label="목록" style="display:none">←</button>
+    <h1 id="title">설계 면접 노트</h1>
+    <button id="fs" aria-label="글자 크기">가</button>
+    <button id="theme" aria-label="테마">◐</button>
+  </div>
+  <div class="tools" id="tools">
+    <select id="toc" aria-label="목차"></select>
+    <input id="q" type="search" placeholder="찾기" aria-label="문서 내 찾기">
+  </div>
+</header>
+<main id="main"></main>
+<button id="top" aria-label="맨 위로">↑</button>
+
+<script>
+const DOCS=[
+  {id:'qbank',t:'A!SK 설계 전공 문항은행',s:'Q1~Q74 · 메모리, 회로, 디지털, STA·합성, NAND/DRAM 에러·검증',tag:'핵심'},
+  {id:'summary',t:'설계 면접 핵심 총정리 v1',s:'면접 구조, 개념 지도, 학습 상태',tag:'핵심'},
+  {id:'nand',t:'NAND Flash 회로설계자 관점',s:'셀, 바이어스, Vth 분포, 주변회로'},
+  {id:'basics',t:'A!SK 설계 기초지식',s:'디바이스·아날로그·디지털·메모리·검증 기초'},
+  {id:'keywords',t:'예상 문항 · 키워드 · 3분 답변',s:'문항별 필수 키워드와 답변 구조'},
+  {id:'mosfet',t:'MOSFET 구조와 작동 원리, 처음부터',s:'기초부터 차근차근'},
+  {id:'mosfet-bjt',t:'3분 답변: MOSFET vs BJT',s:'답변 예시'},
+  {id:'links',t:'참고자료 링크 모음',s:'뉴스룸, 강의, 교재'},
+  {id:'plan-v1',t:'Half-Day 학습 계획 v1',s:'전체 준비 계획'}
+];
+const DECKS=[
+  {u:'https://claude.ai/artifact/J2CEjSvNLBRDDPQR4hH8tH',t:'설계 면접 핵심 총정리',s:'33장'},
+  {u:'https://claude.ai/artifact/VXRcZdKZRGpTKUziM2HUKW',t:'A!SK 출제 카테고리 맵',s:'9장 · 실제 후기 반영'},
+  {u:'https://claude.ai/artifact/6AWV744xABPdsMszA2VhrT',t:'DRAM 회로설계자 관점',s:'17장 + 불량 Q&A'},
+  {u:'https://claude.ai/artifact/G6apmVU5b7mDQLkYDrwRJC',t:'HBM',s:'14장 · 꼬리질문 Q-D~F'},
+  {u:'https://claude.ai/artifact/QJ5a4sEm4zZiQB3QTePQZz',t:'NAND Flash',s:'25장 · 꼬리질문 Q-G~I'},
+  {u:'https://claude.ai/artifact/DZ1acsASGaCvdGmh7Dq7JA',t:'HBF · Z-NAND',s:'12장 · 꼬리질문 Q-J, Q-K'},
+  {u:'https://claude.ai/artifact/JgUYuNUt3kcbCsE9k4uRsh',t:'CMOS 설계 면접 총정리',s:'MOSFET·게이트 지연·전력'},
+  {u:'https://claude.ai/artifact/PkUwv4BdnSKPiu6LatRRxf',t:'삼코치 책 면접 추출',s:'19장 · 아날로그/디지털/레이아웃'}
+];
+const WEEK={id:'w1026',title:'이번 주 (10/26~11/1)',items:[
+  ['월','출퇴근: NAND 덱 꼬리질문 Q-G~I · 저녁: 5개 제품 비교표 백지에 그리기 + HBF 덱 Q-J·K'],
+  ['화','출퇴근: Q17 setup/hold · 저녁: Q48~Q50 중 2개 3분 답변'],
+  ['수','출퇴근: Q51 합성 원리 · 저녁: Q52·Q53 RTL → 게이트 맞히기'],
+  ['목','저녁: Bandgap PT 연습 질문 2부터'],
+  ['금','휴식 · 출퇴근에 Q62~Q71 제목만 보고 답 떠올리기'],
+  ['토','AI PT 1시간: Q27 메모리 병목 + HBM·HBF로 5분 PT 뼈대'],
+  ['일','30분: 이번 주 문항 랜덤 10개 셀프 퀴즈']
+]};
+
+const $=s=>document.querySelector(s);
+const store={get(k,d){try{const v=localStorage.getItem(k);return v===null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const cache={};
+
+// theme & font size
+const root=document.documentElement;
+let theme=store.get('theme',null); if(theme) root.dataset.theme=theme;
+$('#theme').onclick=()=>{const dark=root.dataset.theme?root.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;theme=dark?'light':'dark';root.dataset.theme=theme;store.set('theme',theme)};
+const SIZES=[15,16,17,19]; let fsi=store.get('fsi',1);
+const applyFs=()=>root.style.setProperty('--fs',SIZES[fsi]+'px'); applyFs();
+$('#fs').onclick=()=>{fsi=(fsi+1)%SIZES.length;applyFs();store.set('fsi',fsi)};
+
+function renderHome(){
+  $('#title').textContent='설계 면접 노트'; $('#home').style.display='none'; $('#tools').classList.remove('on');
+  const done=store.get(WEEK.id,[]);
+  let h=`<div class="sec">${WEEK.title}</div><div class="card week">`+
+    WEEK.items.map((it,i)=>`<label class="${done.includes(i)?'done':''}"><input type="checkbox" data-i="${i}" ${done.includes(i)?'checked':''}><span class="t"><span class="d">${it[0]}</span>${esc(it[1])}</span></label>`).join('')+`</div>`;
+  h+=`<div class="sec">문서</div>`+DOCS.map(d=>`<a class="card" href="#${d.id}">${d.tag?`<span class="tag">${d.tag}</span>`:''}<b>${esc(d.t)}</b><span>${esc(d.s)}</span></a>`).join('');
+  h+=`<div class="sec">슬라이드 덱 (claude.ai 로그인 필요)</div>`+DECKS.map(d=>`<a class="card" href="${d.u}" target="_blank" rel="noopener"><b>${esc(d.t)} ↗</b><span>${esc(d.s)}</span></a>`).join('');
+  h+=`<p class="foot">체크 표시와 글자 크기는 이 기기 브라우저에만 저장돼요. 공개 사이트라 개인 경험 연결 문장은 빼고 올렸어요.</p>`;
+  $('#main').innerHTML=h;
+  $('#main').querySelectorAll('.week input').forEach(cb=>cb.onchange=()=>{
+    const i=+cb.dataset.i; let d=store.get(WEEK.id,[]);
+    d=cb.checked?[...new Set([...d,i])]:d.filter(x=>x!==i); store.set(WEEK.id,d);
+    cb.closest('label').classList.toggle('done',cb.checked);
+  });
+  window.scrollTo(0,0);
+}
+
+async function renderDoc(id,anchor){
+  const d=DOCS.find(x=>x.id===id); if(!d) return renderHome();
+  $('#title').textContent=d.t; $('#home').style.display=''; $('#tools').classList.add('on'); $('#q').value='';
+  $('#main').innerHTML='<p style="color:var(--mute)">불러오는 중…</p>';
+  try{
+    if(!cache[id]){const r=await fetch(`docs/${id}.md`);if(!r.ok)throw 0;cache[id]=await r.text()}
+  }catch(e){$('#main').innerHTML='<p>문서를 불러오지 못했어요. 네트워크를 확인해 주세요.</p>';return}
+  const el=document.createElement('article'); el.className='doc'; el.innerHTML=marked.parse(cache[id]);
+  el.querySelectorAll('a[href^="http"]').forEach(a=>{a.target='_blank';a.rel='noopener'});
+  const toc=$('#toc'); toc.innerHTML='<option value="">목차로 이동</option>';
+  el.querySelectorAll('h2,h3').forEach((h,i)=>{h.id='h'+i;const o=document.createElement('option');o.value=h.id;o.textContent=(h.tagName==='H3'?'　· ':'')+h.textContent;toc.appendChild(o)});
+  $('#main').replaceChildren(el);
+  const pos=store.get('pos:'+id,0);
+  if(anchor&&document.getElementById(anchor)) document.getElementById(anchor).scrollIntoView(); else window.scrollTo(0,pos);
+}
+$('#toc').onchange=e=>{const v=e.target.value;if(v)document.getElementById(v).scrollIntoView({behavior:'smooth'});e.target.value=''};
+
+// find in doc
+let qt; $('#q').oninput=e=>{clearTimeout(qt);qt=setTimeout(()=>find(e.target.value.trim()),250)};
+$('#q').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();nextHit()}};
+let hits=[],hi=-1;
+function find(term){
+  const art=$('#main .doc'); if(!art) return;
+  art.querySelectorAll('mark').forEach(m=>m.replaceWith(m.textContent)); art.normalize();
+  hits=[];hi=-1; if(term.length<2) return;
+  const w=document.createTreeWalker(art,NodeFilter.SHOW_TEXT); const nodes=[]; let n; while(n=w.nextNode()) if(n.nodeValue.includes(term)) nodes.push(n);
+  nodes.forEach(t=>{const parts=t.nodeValue.split(term);const f=document.createDocumentFragment();parts.forEach((p,i)=>{f.append(p);if(i<parts.length-1){const m=document.createElement('mark');m.textContent=term;f.append(m);hits.push(m)}});t.replaceWith(f)});
+  nextHit();
+}
+function nextHit(){if(!hits.length)return;hi=(hi+1)%hits.length;hits[hi].scrollIntoView({block:'center'})}
+
+// routing
+function route(){const [id,anchor]=location.hash.slice(1).split('/');id?renderDoc(decodeURIComponent(id),anchor):renderHome()}
+$('#home').onclick=()=>{location.hash=''};
+addEventListener('hashchange',route);
+let st; addEventListener('scroll',()=>{$('#top').style.display=scrollY>800?'block':'none';clearTimeout(st);st=setTimeout(()=>{const id=location.hash.slice(1).split('/')[0];if(id)store.set('pos:'+id,scrollY)},300)});
+$('#top').onclick=()=>window.scrollTo({top:0,behavior:'smooth'});
+route();
+</script>
+</body>
+</html>
