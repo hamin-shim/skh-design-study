@@ -152,7 +152,7 @@ function renderHome(){
 function renderDoc(id,anchor){
   const d=DOCS.find(x=>x.id===id); if(!d) return renderHome();
   $('#title').textContent=d.t; $('#home').style.display=''; $('#tools').classList.add('on'); $('#q').value='';
-  const el=document.createElement('article'); el.className='doc'; el.innerHTML=marked.parse(MD[id]||'');
+  const el=document.createElement('article'); el.className='doc'; el.innerHTML=marked.parse((MD[id]||'').replace(/(?<!~)~(?!~)/g,'\\~'));
   el.querySelectorAll('a[href^="http"]').forEach(a=>{a.target='_blank';a.rel='noopener'});
   const toc=$('#toc'); toc.innerHTML='<option value="">목차로 이동</option>';
   el.querySelectorAll('h2,h3').forEach((h,i)=>{h.id='h'+i;const o=document.createElement('option');o.value=h.id;o.textContent=(h.tagName==='H3'?'　· ':'')+h.textContent;toc.appendChild(o)});
