@@ -32,7 +32,31 @@ main{max-width:760px;margin:0 auto;padding:16px 16px 80px}
 .card b{display:block;font-size:16px}
 .card span{font-size:13px;color:var(--mute)}
 .card .tag{float:right;font-size:12px;color:var(--acc);background:var(--acc-soft);border-radius:999px;padding:1px 8px}
-.week label{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line);font-size:15px;line-height:1.55}
+.week label,.day label{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line);font-size:15px;line-height:1.55}
+.day summary{cursor:pointer;font-size:15px;font-weight:500;list-style:none;display:flex;gap:6px;align-items:center}
+.day summary::-webkit-details-marker{display:none}
+.day summary .cnt{margin-left:auto;font-size:12px;color:var(--mute);background:var(--code);border-radius:999px;padding:1px 8px}
+.day[open] summary{margin-bottom:6px}
+.day input{margin-top:5px;accent-color:var(--acc);width:18px;height:18px;flex:none}
+.day .d{font-weight:700;color:var(--acc);margin-right:4px}
+.day .min{font-size:12px;color:var(--acc);margin-right:6px}
+.day .hint{font-size:13px;color:var(--mute)}
+.day label.done .t{color:var(--mute);text-decoration:line-through}
+.day .eve{font-size:13px;color:var(--mute);margin:8px 0 0;padding-top:8px;border-top:1px dashed var(--line)}
+.exam{border-color:var(--acc);background:var(--acc-soft)}
+.exam .dday{float:right;font-size:22px;font-weight:700;color:var(--acc)}
+.exam b{font-size:16px}
+.exam details{margin-top:8px;font-size:14px}
+.exam summary{cursor:pointer;color:var(--acc);font-weight:500}
+.exam table{border-collapse:collapse;margin-top:6px;width:100%}
+.exam th{text-align:left;vertical-align:top;white-space:nowrap;padding:5px 10px 5px 0;font-size:13px;color:var(--mute);font-weight:500}
+.exam td{padding:5px 0;font-size:14px;line-height:1.5;border-top:1px solid var(--line)}
+.exam th{border-top:1px solid var(--line)}
+.hint{font-size:12px;color:var(--mute)}
+.note{font-size:13px;color:var(--mute);margin:6px 2px}
+.sub{font-size:12px;color:var(--mute);margin:14px 2px 2px}
+.fold summary{cursor:pointer}
+.tag.st-완료{color:#1d4ed8;background:#e0eaff}.tag.st-일부{color:#b45309;background:#fff1d6}.tag.st-미확인{color:var(--mute);background:var(--code)}
 .week label:first-of-type{border-top:0}
 .week input{margin-top:5px;accent-color:var(--acc);width:18px;height:18px;flex:none}
 .week .d{font-weight:700;color:var(--acc);margin-right:4px}
@@ -72,7 +96,7 @@ main{max-width:760px;margin:0 auto;padding:16px 16px 80px}
 <button id="top" aria-label="맨 위로">↑</button>
 
 <script>
-let DOCS=[],DECKS=[],WEEK=null,MD={};
+let DOCS=[],DECKS=[],WEEK=null,MD={},GROUPS=[],EXAM=null;
 
 const $=s=>document.querySelector(s);
 const store={get(k,d){try{const v=localStorage.getItem(k);return v===null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
@@ -89,16 +113,37 @@ $('#fs').onclick=()=>{fsi=(fsi+1)%SIZES.length;applyFs();store.set('fsi',fsi)};
 function renderHome(){
   $('#title').textContent='설계 면접 노트'; $('#home').style.display='none'; $('#tools').classList.remove('on');
   const done=store.get(WEEK.id,[]);
-  let h=`<div class="sec">${WEEK.title}</div><div class="card week">`+
-    WEEK.items.map((it,i)=>`<label class="${done.includes(i)?'done':''}"><input type="checkbox" data-i="${i}" ${done.includes(i)?'checked':''}><span class="t"><span class="d">${it[0]}</span>${esc(it[1])}</span></label>`).join('')+`</div>`;
-  h+=`<div class="sec">문서</div>`+DOCS.map(d=>`<a class="card" href="#${d.id}">${d.tag?`<span class="tag">${d.tag}</span>`:''}<b>${esc(d.t)}</b><span>${esc(d.s)}</span></a>`).join('');
-  h+=`<div class="sec">슬라이드 덱 (claude.ai 로그인 필요)</div>`+DECKS.map(d=>`<a class="card" href="${d.u}" target="_blank" rel="noopener"><b>${esc(d.t)} ↗</b><span>${esc(d.s)}</span></a>`).join('');
+  const t=new Date(), today=`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+  let ti=WEEK.days.findIndex(d=>d.d===today); if(ti<0) ti=WEEK.days.findIndex(d=>d.d>today); 
+  let h='';
+  if(EXAM){const dd=Math.ceil((new Date(EXAM.date+'T00:00:00')-new Date(today+'T00:00:00'))/864e5);
+    h+=`<div class="card exam"><div class="dday">${dd>0?'D-'+dd:dd===0?'D-DAY':'끝'}</div><b>${esc(EXAM.title)}</b>`+
+      `<details><summary>일정 · 장소 · 준비물</summary><table>${EXAM.rows.map(r=>`<tr><th>${esc(r[0])}</th><td>${esc(r[1])}</td></tr>`).join('')}</table></details>`+
+      `<details><summary>11/24까지 주차 계획</summary><table>${EXAM.plan.map(r=>`<tr><th>${esc(r[0])}<br><span class="hint">${esc(r[1])}</span></th><td>${esc(r[2])}</td></tr>`).join('')}</table></details></div>`;}
+  h+=`<div class="sec">${esc(WEEK.title)}</div><p class="note">${esc(WEEK.note)}</p>`;
+  WEEK.days.forEach((d,di)=>{
+    const n=d.b.filter((_,bi)=>done.includes(di+'-'+bi)).length;
+    h+=`<details class="card day" ${di===ti?'open':''}><summary><span class="d">${esc(d.k)}</span>${esc(d.th)}<span class="cnt">${n}/${d.b.length}</span></summary>`+
+      d.b.map((x,bi)=>{const k=di+'-'+bi,on=done.includes(k);return `<label class="${on?'done':''}"><input type="checkbox" data-k="${k}" ${on?'checked':''}><span class="t"><span class="min">${esc(x[0])}</span><b>${esc(x[1])}</b><br><span class="hint">${esc(x[2])}</span></span></label>`}).join('')+
+      `<p class="eve">${esc(d.e)}</p></details>`;
+  });
+  h+=`<p class="note">${esc(WEEK.later)}</p>`;
+  GROUPS.forEach(([g,name])=>{
+    const ds=DOCS.filter(d=>d.g===g); if(!ds.length) return;
+    const body=ds.map(d=>`<a class="card" href="#${d.id}">${d.tag?`<span class="tag">${esc(d.tag)}</span>`:''}<b>${esc(d.t)}</b><span>${esc(d.s)}</span></a>`).join('');
+    h+= g==='old' ? `<details class="fold"><summary class="sec">${esc(name)}</summary>${body}</details>` : `<div class="sec">${esc(name)}</div>${body}`;
+  });
+  h+=`<div class="sec">슬라이드 덱 (claude.ai 로그인 필요)</div>`;
+  [...new Set(DECKS.map(d=>d.g))].forEach(g=>{
+    h+=`<div class="sub">${esc(g)}</div>`+DECKS.filter(d=>d.g===g).map(d=>`<a class="card" href="${d.u}" target="_blank" rel="noopener"><span class="tag st-${esc(d.st)}">${esc(d.st)}</span><b>${esc(d.t)} ↗</b><span>${esc(d.s)}</span></a>`).join('');
+  });
   h+=`<p class="foot">체크 표시와 글자 크기는 이 기기 브라우저에만 저장돼요. 공개 사이트라 개인 경험 연결 문장은 빼고 올렸어요. 로그인은 7일간 유지돼요.</p><p><button id="logout">로그아웃</button></p>`;
   $('#main').innerHTML=h;
-  $('#main').querySelectorAll('.week input').forEach(cb=>cb.onchange=()=>{
-    const i=+cb.dataset.i; let d=store.get(WEEK.id,[]);
-    d=cb.checked?[...new Set([...d,i])]:d.filter(x=>x!==i); store.set(WEEK.id,d);
+  $('#main').querySelectorAll('.day input').forEach(cb=>cb.onchange=()=>{
+    const k=cb.dataset.k; let d=store.get(WEEK.id,[]);
+    d=cb.checked?[...new Set([...d,k])]:d.filter(x=>x!==k); store.set(WEEK.id,d);
     cb.closest('label').classList.toggle('done',cb.checked);
+    const det=cb.closest('details'); det.querySelector('.cnt').textContent=det.querySelectorAll('input:checked').length+'/'+det.querySelectorAll('input').length;
   });
   $('#logout').onclick=()=>{document.cookie='skhkey=; max-age=0; path=/';location.reload()};
   window.scrollTo(0,0);
@@ -149,7 +194,7 @@ async function decryptWith(raw){
   const key=await crypto.subtle.importKey('raw',raw,'AES-GCM',false,['decrypt']);
   const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64d(e.iv)},key,b64d(e.ct));
   const c=JSON.parse(new TextDecoder().decode(pt));
-  DOCS=c.docs;DECKS=c.decks;WEEK=c.week;MD=c.md;
+  DOCS=c.docs;DECKS=c.decks;WEEK=c.week;MD=c.md;GROUPS=c.groups||[];EXAM=c.exam||null;
 }
 async function deriveRaw(pw){
   const e=await loadEnc();
