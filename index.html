@@ -75,6 +75,15 @@ main{max-width:760px;margin:0 auto;padding:16px 16px 80px}
 .doc blockquote{margin:1em 0;padding:8px 14px;border-left:4px solid var(--acc);background:var(--acc-soft);border-radius:0 10px 10px 0}
 .doc mark{background:#fde047;color:#111}
 .doc img{max-width:100%}
+.qbar{display:flex;flex-wrap:wrap;gap:6px;margin:-4px 0 12px}
+.qbar button{font-size:12px;padding:3px 10px;border-radius:999px;color:var(--mute)}
+.qbar button.on{color:var(--acc);border-color:var(--acc);background:var(--acc-soft);font-weight:500}
+.qbar textarea{display:none;width:100%;font:inherit;font-size:14px;line-height:1.5;color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px;resize:vertical}
+.qbar.open textarea{display:block}
+.doc h3.is-last{border-left:4px solid var(--acc);padding-left:8px}
+.qpanel{font-size:14px}
+.qpanel p{margin:6px 0}
+.qpanel a{display:inline-block;margin:2px 6px 2px 0;text-decoration:none;background:var(--acc-soft);border-radius:999px;padding:0 9px}
 #top{position:fixed;right:16px;bottom:20px;border-radius:999px;width:44px;height:44px;padding:0;box-shadow:0 2px 10px rgba(0,0,0,.15);display:none}
 .foot{font-size:12px;color:var(--mute);margin-top:30px}
 </style>
@@ -130,14 +139,14 @@ function renderHome(){
   h+=`<p class="note">${esc(WEEK.later)}</p>`;
   GROUPS.forEach(([g,name])=>{
     const ds=DOCS.filter(d=>d.g===g); if(!ds.length) return;
-    const body=ds.map(d=>`<a class="card" href="#${d.id}">${d.tag?`<span class="tag">${esc(d.tag)}</span>`:''}<b>${esc(d.t)}</b><span>${esc(d.s)}</span></a>`).join('');
+    const body=ds.map(d=>`<a class="card" href="#${d.id}">${d.tag?`<span class="tag">${esc(d.tag)}</span>`:''}<b>${esc(d.t)}</b><span>${esc(d.s)}${(()=>{const m=store.get(QK(d.id),null);return m&&m.last?' · 📍 '+esc(m.last)+'까지':''})()}</span></a>`).join('');
     h+= g==='old' ? `<details class="fold"><summary class="sec">${esc(name)}</summary>${body}</details>` : `<div class="sec">${esc(name)}</div>${body}`;
   });
   h+=`<div class="sec">슬라이드 덱 (claude.ai 로그인 필요)</div>`;
   [...new Set(DECKS.map(d=>d.g))].forEach(g=>{
     h+=`<div class="sub">${esc(g)}</div>`+DECKS.filter(d=>d.g===g).map(d=>`<a class="card" href="${d.u}" target="_blank" rel="noopener"><span class="tag st-${esc(d.st)}">${esc(d.st)}</span><b>${esc(d.t)} ↗</b><span>${esc(d.s)}</span></a>`).join('');
   });
-  h+=`<p class="foot">체크 표시와 글자 크기는 이 기기 브라우저에만 저장돼요. 공개 사이트라 개인 경험 연결 문장은 빼고 올렸어요. 로그인은 7일간 유지돼요.</p><p><button id="logout">로그아웃</button></p>`;
+  h+=`<p class="foot">체크 표시, 문항 책갈피·메모, 글자 크기는 이 기기 브라우저에만 저장돼요. 공개 사이트라 개인 경험 연결 문장은 빼고 올렸어요. 로그인은 7일간 유지돼요.</p><p><button id="logout">로그아웃</button></p>`;
   $('#main').innerHTML=h;
   $('#main').querySelectorAll('.day input').forEach(cb=>cb.onchange=()=>{
     const k=cb.dataset.k; let d=store.get(WEEK.id,[]);
@@ -149,13 +158,49 @@ function renderHome(){
   window.scrollTo(0,0);
 }
 
+// per-question bookmarks (this device only)
+const QK=id=>'qm:'+id;
+const qState=id=>Object.assign({last:null,flags:[],memos:{}},store.get(QK(id),{}));
+function addMarks(el,id){
+  const qs=[...el.querySelectorAll('h3')].filter(h=>/^Q\d+\./.test(h.textContent.trim()));
+  if(!qs.length) return;
+  const S=qState(id), num=q=>+q.slice(1), sort=a=>[...a].sort((x,y)=>num(x)-num(y));
+  const panel=document.createElement('div'); panel.className='card qpanel';
+  const link=(q,txt)=>`<a href="#${id}/q-${num(q)}">${txt||q}</a>`;
+  const paintPanel=()=>{const memoQs=sort(Object.keys(S.memos));
+    panel.innerHTML=`<b>내 표시</b>`+
+      (S.last?`<p>📍 ${link(S.last,S.last+'부터 이어서 보기')}</p>`:`<p class="hint">문항 아래 📍 여기까지 를 누르면 이어 볼 위치가 저장돼요.</p>`)+
+      (S.flags.length?`<p>🔁 다시 볼 것 ${sort(S.flags).map(q=>link(q)).join('')}</p>`:'')+
+      (memoQs.length?`<p>✏️ 메모 ${memoQs.map(q=>link(q)).join('')}</p>`:'')+
+      `<p class="hint">표시와 메모는 이 기기 브라우저에만 저장돼요.</p>`};
+  const save=()=>{store.set(QK(id),S);paintPanel()};
+  qs.forEach(h=>{
+    const q=h.textContent.trim().match(/^(Q\d+)\./)[1]; h.id='q-'+num(q); h.dataset.q=q;
+    const bar=document.createElement('div'); bar.className='qbar';
+    bar.innerHTML='<button data-a="last">📍 여기까지</button><button data-a="flag">🔁 다시 볼 것</button><button data-a="memo">✏️ 메모</button><textarea rows="3" placeholder="메모 (자동 저장)"></textarea>';
+    h.after(bar);
+    const ta=bar.querySelector('textarea'); ta.value=S.memos[q]||''; if(S.memos[q]) bar.classList.add('open');
+    h._paint=()=>{bar.querySelector('[data-a=last]').classList.toggle('on',S.last===q);bar.querySelector('[data-a=flag]').classList.toggle('on',S.flags.includes(q));bar.querySelector('[data-a=memo]').classList.toggle('on',!!S.memos[q]);h.classList.toggle('is-last',S.last===q)};
+    h._paint();
+    bar.onclick=e=>{const a=e.target.dataset&&e.target.dataset.a; if(!a) return;
+      if(a==='memo'){bar.classList.toggle('open'); if(bar.classList.contains('open')) ta.focus(); return}
+      if(a==='last'){S.last=S.last===q?null:q; qs.forEach(x=>x._paint())}
+      else {S.flags=S.flags.includes(q)?S.flags.filter(x=>x!==q):[...S.flags,q]; h._paint()}
+      save()};
+    let mt; ta.oninput=()=>{clearTimeout(mt);mt=setTimeout(()=>{if(ta.value.trim()) S.memos[q]=ta.value; else delete S.memos[q]; h._paint(); save()},400)};
+  });
+  paintPanel();
+  const h1=el.querySelector('h1'); h1?h1.after(panel):el.prepend(panel);
+}
+
 function renderDoc(id,anchor){
   const d=DOCS.find(x=>x.id===id); if(!d) return renderHome();
   $('#title').textContent=d.t; $('#home').style.display=''; $('#tools').classList.add('on'); $('#q').value='';
   const el=document.createElement('article'); el.className='doc'; el.innerHTML=marked.parse((MD[id]||'').replace(/(?<!~)~(?!~)/g,'\\~'));
   el.querySelectorAll('a[href^="http"]').forEach(a=>{a.target='_blank';a.rel='noopener'});
+  addMarks(el,id); const QS=qState(id);
   const toc=$('#toc'); toc.innerHTML='<option value="">목차로 이동</option>';
-  el.querySelectorAll('h2,h3').forEach((h,i)=>{h.id='h'+i;const o=document.createElement('option');o.value=h.id;o.textContent=(h.tagName==='H3'?'　· ':'')+h.textContent;toc.appendChild(o)});
+  el.querySelectorAll('h2,h3').forEach((h,i)=>{if(!h.id)h.id='h'+i;const o=document.createElement('option');o.value=h.id;const q=h.dataset.q;o.textContent=(h.tagName==='H3'?'　· ':'')+(q&&QS.last===q?'📍':'')+(q&&QS.flags.includes(q)?'🔁':'')+h.textContent;toc.appendChild(o)});
   $('#main').replaceChildren(el);
   const pos=store.get('pos:'+id,0);
   if(anchor&&document.getElementById(anchor)) document.getElementById(anchor).scrollIntoView(); else window.scrollTo(0,pos);
