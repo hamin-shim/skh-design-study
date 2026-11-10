@@ -54,6 +54,23 @@ main{max-width:760px;margin:0 auto;padding:16px 16px 80px}
 .exam th{border-top:1px solid var(--line)}
 .hint{font-size:12px;color:var(--mute)}
 .note{font-size:13px;color:var(--mute);margin:6px 2px}
+.days{display:flex;align-items:flex-start;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;margin:8px -16px 0;padding:2px 16px 10px;scrollbar-width:none}
+.days::-webkit-scrollbar{display:none}
+.days .day{flex:0 0 86%;max-width:420px;scroll-snap-align:center;margin:0}
+.day.is-today{border-color:var(--acc)}
+.day .dh{display:flex;gap:6px;align-items:center;font-size:15px}
+.day .dh .cnt{margin-left:auto;font-size:12px;color:var(--mute);background:var(--code);border-radius:999px;padding:1px 8px}
+.day .th{font-weight:600;margin:2px 0 4px}
+.day .lk{display:flex;flex-wrap:wrap;gap:5px;margin:-2px 0 8px 28px}
+.day .lk a{font-size:12.5px;text-decoration:none;background:var(--acc-soft);color:var(--acc);border-radius:999px;padding:2px 9px}
+.dstrip{display:flex;gap:6px;overflow-x:auto;margin:6px -16px 0;padding:2px 16px;scrollbar-width:none}
+.dstrip::-webkit-scrollbar{display:none}
+.dstrip button{flex:none;display:flex;flex-direction:column;align-items:center;font-size:13px;padding:4px 9px;border-radius:10px;line-height:1.2}
+.dstrip button small{font-size:10.5px;color:var(--mute)}
+.dstrip button.past{opacity:.6}
+.dstrip button.today{border-color:var(--acc)}
+.dstrip button.on{background:var(--acc);color:#fff;border-color:var(--acc);opacity:1}
+.dstrip button.on small{color:#fff}
 .sub{font-size:12px;color:var(--mute);margin:14px 2px 2px}
 .fold summary{cursor:pointer}
 .tag.st-완료{color:#1d4ed8;background:#e0eaff}.tag.st-일부{color:#b45309;background:#fff1d6}.tag.st-미확인{color:var(--mute);background:var(--code)}
@@ -134,17 +151,17 @@ function renderHome(){
       `<details><summary>11/24까지 주차 계획</summary><table>${EXAM.plan.map(r=>`<tr><th>${esc(r[0])}<br><span class="hint">${esc(r[1])}</span></th><td>${esc(r[2])}</td></tr>`).join('')}</table></details></div>`;}
   if(MUST.length){h+=`<div class="sec">반드시 말할 것 (누르면 그 문항으로)</div><div class="card qpanel">`+MUST.map(([g,xs])=>`<p><b>${esc(g)}</b><br>${xs.map(([l,n])=>`<a href="#q/${n}">Q${n} ${esc(l)}</a>`).join('')}</p>`).join('')+`</div>`;}
   h+=`<div class="sec">${esc(WEEK.title)}</div><p class="note">${esc(WEEK.note)}</p>`;
-  if(ti<0) ti=WEEK.days.length; const SHOW=4; let past='',soon='',later='';
-  WEEK.days.forEach((d,di)=>{let h='';
+  if(ti<0) ti=WEEK.days.length-1;
+  const lk=([l,u])=>u.startsWith('#')?`<a href="${esc(u)}">${esc(l)}</a>`:`<a href="${esc(u)}" target="_blank" rel="noopener">${esc(l)}</a>`;
+  h+=`<div class="dstrip" id="dstrip">`+WEEK.days.map((d,di)=>`<button data-i="${di}" class="${di===ti?'today':''}${d.d<WEEK.days[ti].d?' past':''}">${esc(d.k.split(' ')[1]||d.k)}<small>${esc(d.k.split(' ')[0])}</small></button>`).join('')+`</div>`;
+  h+=`<div class="days" id="days">`;
+  WEEK.days.forEach((d,di)=>{
     const n=d.b.filter((_,bi)=>done.includes(di+'-'+bi)).length;
-    h+=`<details class="card day" ${di===ti?'open':''}><summary><span class="d">${esc(d.k)}</span>${esc(d.th)}<span class="cnt">${n}/${d.b.length}</span></summary>`+
-      d.b.map((x,bi)=>{const k=di+'-'+bi,on=done.includes(k);return `<label class="${on?'done':''}"><input type="checkbox" data-k="${k}" ${on?'checked':''}><span class="t"><span class="min">${esc(x[0])}</span><b>${esc(x[1])}</b><br><span class="hint">${esc(x[2])}</span></span></label>`}).join('')+
-      `<p class="eve">${esc(d.e)}</p></details>`;
-    if(di<ti) past+=h; else if(di<ti+SHOW) soon+=h; else later+=h;
+    h+=`<div class="card day${di===ti?' is-today':''}" data-i="${di}"><div class="dh"><span class="d">${esc(d.k)}</span>${di===ti?'<span class="tag">오늘</span>':''}<span class="cnt">${n}/${d.b.length}</span></div><div class="th">${esc(d.th)}</div>`+
+      d.b.map((x,bi)=>{const k=di+'-'+bi,on=done.includes(k);return `<label class="${on?'done':''}"><input type="checkbox" data-k="${k}" ${on?'checked':''}><span class="t"><span class="min">${esc(x[0])}</span><b>${esc(x[1])}</b>${x[2]?`<br><span class="hint">${esc(x[2])}</span>`:''}</span></label>`+(x[3]&&x[3].length?`<div class="lk">${x[3].map(lk).join('')}</div>`:'')}).join('')+
+      (d.e?`<p class="eve">${esc(d.e)}</p>`:'')+`</div>`;
   });
-  if(past) h+=`<details class="fold"><summary class="sub">지난 날 보기</summary>${past}</details>`;
-  h+=soon;
-  if(later) h+=`<details class="fold"><summary class="sub">그다음 날짜 보기</summary>${later}</details>`;
+  h+=`</div>`;
   h+=`<p class="note">${esc(WEEK.later)}</p>`;
   GROUPS.forEach(([g,name])=>{
     const ds=DOCS.filter(d=>d.g===g); if(!ds.length) return;
@@ -161,8 +178,14 @@ function renderHome(){
     const k=cb.dataset.k; let d=store.get(WEEK.id,[]);
     d=cb.checked?[...new Set([...d,k])]:d.filter(x=>x!==k); store.set(WEEK.id,d);
     cb.closest('label').classList.toggle('done',cb.checked);
-    const det=cb.closest('details'); det.querySelector('.cnt').textContent=det.querySelectorAll('input:checked').length+'/'+det.querySelectorAll('input').length;
+    const det=cb.closest('.day'); det.querySelector('.cnt').textContent=det.querySelectorAll('input:checked').length+'/'+det.querySelectorAll('input').length;
   });
+  const days=$('#days'), strip=$('#dstrip');
+  const mark=i=>{strip.querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.i===i));const b=strip.querySelector(`[data-i="${i}"]`);if(b)strip.scrollTo({left:b.offsetLeft-strip.clientWidth/2+b.clientWidth/2,behavior:'smooth'})};
+  const go=(i,smooth)=>{const c=days.querySelector(`[data-i="${i}"]`);if(c)days.scrollTo({left:c.offsetLeft-days.offsetLeft-(days.clientWidth-c.clientWidth)/2,behavior:smooth?'smooth':'auto'});mark(i)};
+  strip.onclick=e=>{const b=e.target.closest('button');if(b)go(+b.dataset.i,true)};
+  let dt;days.onscroll=()=>{clearTimeout(dt);dt=setTimeout(()=>{const mid=days.scrollLeft+days.clientWidth/2;let best=0,bd=1e9;days.querySelectorAll('.day').forEach(c=>{const x=c.offsetLeft-days.offsetLeft+c.clientWidth/2;if(Math.abs(x-mid)<bd){bd=Math.abs(x-mid);best=+c.dataset.i}});mark(best)},120)};
+  go(ti,false);
   $('#logout').onclick=()=>{document.cookie='skhkey=; max-age=0; path=/';location.reload()};
   window.scrollTo(0,0);
 }
