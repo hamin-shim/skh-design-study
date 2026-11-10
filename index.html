@@ -86,6 +86,17 @@ main{max-width:760px;margin:0 auto;padding:16px 16px 80px}
 .doc table{display:block;overflow-x:auto;border-collapse:collapse;font-size:.9em;margin:1em 0}
 .doc th,.doc td{border:1px solid var(--line);padding:6px 8px;vertical-align:top;min-width:90px}
 .doc th{background:var(--code)}
+@media (max-width:640px){
+ .doc table.stack{display:block;border:0;font-size:.95em}
+ .doc table.stack thead{display:none}
+ .doc table.stack tbody,.doc table.stack tr,.doc table.stack td{display:block;min-width:0;border:0}
+ .doc table.stack tr{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin:0 0 10px}
+ .doc table.stack td{padding:3px 0}
+ .doc table.stack td::before{content:attr(data-l);display:block;font-size:11.5px;color:var(--mute);font-weight:500}
+ .doc table.stack td.k{font-weight:700;color:var(--acc);font-size:1.02em}
+ .doc table.stack td.k::before{display:none}
+ .doc table.stack td:empty{display:none}
+}
 .doc code{background:var(--code);border-radius:5px;padding:1px 5px;font-size:.9em}
 .doc pre{background:var(--code);padding:12px;border-radius:10px;overflow-x:auto;font-size:.85em}
 .doc pre code{padding:0}
@@ -117,7 +128,7 @@ main{max-width:760px;margin:0 auto;padding:16px 16px 80px}
   </div>
   <div class="tools" id="tools">
     <select id="toc" aria-label="목차"></select>
-    <input id="q" type="search" placeholder="찾기 · Q번호(예: 146)" aria-label="문서 내 찾기">
+    <input id="q" type="search" placeholder="찾기 · 번호" aria-label="문서 내 찾기">
   </div>
 </header>
 <main id="main"></main>
@@ -249,6 +260,8 @@ function renderDoc(id,anchor){
   const el=document.createElement('article'); el.className='doc'; el.innerHTML=marked.parse((MD[id]||'').replace(/(?<!~)~(?!~)/g,'\\~'));
   el.querySelectorAll('a[href^="http"]').forEach(a=>{a.target='_blank';a.rel='noopener'});
   addMarks(el,id); const QS=qState(id); linkQ(el,id);
+  el.querySelectorAll('table').forEach(tb=>{const hs=[...tb.querySelectorAll('thead th')].map(x=>x.textContent.trim());if(hs.length<3)return;tb.classList.add('stack');
+    tb.querySelectorAll('tbody tr').forEach(tr=>[...tr.children].forEach((td,i)=>{td.dataset.l=hs[i]||'';if(i===0)td.classList.add('k')}))});
   const toc=$('#toc'); toc.innerHTML='<option value="">목차로 이동</option>'; let grp=toc;
   el.querySelectorAll('h2,h3').forEach((h,i)=>{if(!h.id)h.id='h'+i;
     if(h.tagName==='H2'){grp=document.createElement('optgroup');grp.label=h.textContent.slice(0,40);toc.appendChild(grp)}
