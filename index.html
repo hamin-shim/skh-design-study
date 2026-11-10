@@ -84,6 +84,8 @@ main{max-width:760px;margin:0 auto;padding:16px 16px 80px}
 .qpanel{font-size:14px}
 .qpanel p{margin:6px 0}
 .qpanel a{display:inline-block;margin:2px 6px 2px 0;text-decoration:none;background:var(--acc-soft);border-radius:999px;padding:0 9px}
+.doc a.qref{text-decoration:none;border-bottom:1px dashed var(--acc);font-weight:500}
+#back{position:fixed;left:16px;bottom:20px;border-radius:999px;padding:0 14px;height:40px;box-shadow:0 2px 10px rgba(0,0,0,.15);display:none;background:var(--card);color:var(--acc);border:1px solid var(--acc);font-size:14px}
 #top{position:fixed;right:16px;bottom:20px;border-radius:999px;width:44px;height:44px;padding:0;box-shadow:0 2px 10px rgba(0,0,0,.15);display:none}
 .foot{font-size:12px;color:var(--mute);margin-top:30px}
 </style>
@@ -98,11 +100,12 @@ main{max-width:760px;margin:0 auto;padding:16px 16px 80px}
   </div>
   <div class="tools" id="tools">
     <select id="toc" aria-label="목차"></select>
-    <input id="q" type="search" placeholder="찾기" aria-label="문서 내 찾기">
+    <input id="q" type="search" placeholder="찾기 · Q번호(예: 146)" aria-label="문서 내 찾기">
   </div>
 </header>
 <main id="main"></main>
 <button id="top" aria-label="맨 위로">↑</button>
+<button id="back" aria-label="보던 곳으로">← 보던 곳</button>
 
 <script>
 let DOCS=[],DECKS=[],WEEK=null,MD={},GROUPS=[],EXAM=null;
@@ -193,14 +196,34 @@ function addMarks(el,id){
   const h1=el.querySelector('h1'); h1?h1.after(panel):el.prepend(panel);
 }
 
+// Q-number references → links. Same doc if that question is here, otherwise the question bank.
+function linkQ(el,id){
+  const has=n=>!!el.querySelector('#q-'+n);
+  const w=document.createTreeWalker(el,NodeFilter.SHOW_TEXT,{acceptNode:n=>n.parentElement.closest('h3,a,code,pre,textarea,.qbar')?NodeFilter.FILTER_REJECT:(/Q\d{1,3}/.test(n.nodeValue)?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_SKIP)});
+  const nodes=[];let n;while(n=w.nextNode())nodes.push(n);
+  nodes.forEach(t=>{const f=document.createDocumentFragment();let last=0;
+    t.nodeValue.replace(/Q(\d{1,3})(?!\d)/g,(m,num,off)=>{
+      const local=has(num); if(!local&&id==='qbank') return m;
+      f.append(t.nodeValue.slice(last,off));const a=document.createElement('a');a.className='qref';a.textContent=m;
+      a.href=local?`#${id}/q-${num}`:`#qbank/q-${num}`; if(local)a.dataset.local=num; f.append(a);last=off+m.length;return m});
+    if(last){f.append(t.nodeValue.slice(last));t.replaceWith(f)}});
+}
+let BACK=[];
+const paintBack=()=>{$('#back').style.display=BACK.length?'block':'none'};
+function jumpTo(elId){const x=document.getElementById(elId);if(!x)return false;BACK.push(scrollY);paintBack();x.scrollIntoView({behavior:'smooth'});return true}
+$('#main').addEventListener('click',e=>{const a=e.target.closest('a.qref');if(a&&a.dataset.local){e.preventDefault();jumpTo('q-'+a.dataset.local)}});
+$('#back').onclick=()=>{const y=BACK.pop();paintBack();if(y!==undefined)window.scrollTo({top:y,behavior:'smooth'})};
 function renderDoc(id,anchor){
   const d=DOCS.find(x=>x.id===id); if(!d) return renderHome();
   $('#title').textContent=d.t; $('#home').style.display=''; $('#tools').classList.add('on'); $('#q').value='';
   const el=document.createElement('article'); el.className='doc'; el.innerHTML=marked.parse((MD[id]||'').replace(/(?<!~)~(?!~)/g,'\\~'));
   el.querySelectorAll('a[href^="http"]').forEach(a=>{a.target='_blank';a.rel='noopener'});
-  addMarks(el,id); const QS=qState(id);
-  const toc=$('#toc'); toc.innerHTML='<option value="">목차로 이동</option>';
-  el.querySelectorAll('h2,h3').forEach((h,i)=>{if(!h.id)h.id='h'+i;const o=document.createElement('option');o.value=h.id;const q=h.dataset.q;o.textContent=(h.tagName==='H3'?'　· ':'')+(q&&QS.last===q?'📍':'')+(q&&QS.flags.includes(q)?'🔁':'')+h.textContent;toc.appendChild(o)});
+  addMarks(el,id); const QS=qState(id); linkQ(el,id);
+  const toc=$('#toc'); toc.innerHTML='<option value="">목차로 이동</option>'; let grp=toc;
+  el.querySelectorAll('h2,h3').forEach((h,i)=>{if(!h.id)h.id='h'+i;
+    if(h.tagName==='H2'){grp=document.createElement('optgroup');grp.label=h.textContent.slice(0,40);toc.appendChild(grp)}
+    const o=document.createElement('option');o.value=h.id;const q=h.dataset.q;o.textContent=(h.tagName==='H2'?'▸ ':'')+(q&&QS.last===q?'📍':'')+(q&&QS.flags.includes(q)?'🔁':'')+h.textContent;grp.appendChild(o)});
+  BACK=[];paintBack();
   $('#main').replaceChildren(el);
   const pos=store.get('pos:'+id,0);
   if(anchor&&document.getElementById(anchor)) document.getElementById(anchor).scrollIntoView(); else window.scrollTo(0,pos);
@@ -209,12 +232,12 @@ $('#toc').onchange=e=>{const v=e.target.value;if(v)document.getElementById(v).sc
 
 // find in doc
 let qt; $('#q').oninput=e=>{clearTimeout(qt);qt=setTimeout(()=>find(e.target.value.trim()),250)};
-$('#q').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();nextHit()}};
+$('#q').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();const m=e.target.value.trim().match(/^[qQ]?(\d{1,3})$/);if(m&&jumpTo('q-'+m[1])){e.target.blur();return}nextHit()}};
 let hits=[],hi=-1;
 function find(term){
   const art=$('#main .doc'); if(!art) return;
   art.querySelectorAll('mark').forEach(m=>m.replaceWith(m.textContent)); art.normalize();
-  hits=[];hi=-1; if(term.length<2) return;
+  hits=[];hi=-1; if(term.length<2||/^[qQ]?\d{1,3}$/.test(term)) return;
   const w=document.createTreeWalker(art,NodeFilter.SHOW_TEXT); const nodes=[]; let n; while(n=w.nextNode()) if(n.nodeValue.includes(term)) nodes.push(n);
   nodes.forEach(t=>{const parts=t.nodeValue.split(term);const f=document.createDocumentFragment();parts.forEach((p,i)=>{f.append(p);if(i<parts.length-1){const m=document.createElement('mark');m.textContent=term;f.append(m);hits.push(m)}});t.replaceWith(f)});
   nextHit();
