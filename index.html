@@ -108,7 +108,7 @@ main{max-width:760px;margin:0 auto;padding:16px 16px 80px}
 <button id="back" aria-label="보던 곳으로">← 보던 곳</button>
 
 <script>
-let DOCS=[],DECKS=[],WEEK=null,MD={},GROUPS=[],EXAM=null;
+let DOCS=[],DECKS=[],WEEK=null,MD={},GROUPS=[],EXAM=null,QMAP={},MUST=[];
 
 const $=s=>document.querySelector(s);
 const store={get(k,d){try{const v=localStorage.getItem(k);return v===null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
@@ -132,13 +132,19 @@ function renderHome(){
     h+=`<div class="card exam"><div class="dday">${dd>0?'D-'+dd:dd===0?'D-DAY':'끝'}</div><b>${esc(EXAM.title)}</b>`+
       `<details><summary>일정 · 장소 · 준비물</summary><table>${EXAM.rows.map(r=>`<tr><th>${esc(r[0])}</th><td>${esc(r[1])}</td></tr>`).join('')}</table></details>`+
       `<details><summary>11/24까지 주차 계획</summary><table>${EXAM.plan.map(r=>`<tr><th>${esc(r[0])}<br><span class="hint">${esc(r[1])}</span></th><td>${esc(r[2])}</td></tr>`).join('')}</table></details></div>`;}
+  if(MUST.length){h+=`<div class="sec">반드시 말할 것 (누르면 그 문항으로)</div><div class="card qpanel">`+MUST.map(([g,xs])=>`<p><b>${esc(g)}</b><br>${xs.map(([l,n])=>`<a href="#q/${n}">Q${n} ${esc(l)}</a>`).join('')}</p>`).join('')+`</div>`;}
   h+=`<div class="sec">${esc(WEEK.title)}</div><p class="note">${esc(WEEK.note)}</p>`;
-  WEEK.days.forEach((d,di)=>{
+  if(ti<0) ti=WEEK.days.length; const SHOW=4; let past='',soon='',later='';
+  WEEK.days.forEach((d,di)=>{let h='';
     const n=d.b.filter((_,bi)=>done.includes(di+'-'+bi)).length;
     h+=`<details class="card day" ${di===ti?'open':''}><summary><span class="d">${esc(d.k)}</span>${esc(d.th)}<span class="cnt">${n}/${d.b.length}</span></summary>`+
       d.b.map((x,bi)=>{const k=di+'-'+bi,on=done.includes(k);return `<label class="${on?'done':''}"><input type="checkbox" data-k="${k}" ${on?'checked':''}><span class="t"><span class="min">${esc(x[0])}</span><b>${esc(x[1])}</b><br><span class="hint">${esc(x[2])}</span></span></label>`}).join('')+
       `<p class="eve">${esc(d.e)}</p></details>`;
+    if(di<ti) past+=h; else if(di<ti+SHOW) soon+=h; else later+=h;
   });
+  if(past) h+=`<details class="fold"><summary class="sub">지난 날 보기</summary>${past}</details>`;
+  h+=soon;
+  if(later) h+=`<details class="fold"><summary class="sub">그다음 날짜 보기</summary>${later}</details>`;
   h+=`<p class="note">${esc(WEEK.later)}</p>`;
   GROUPS.forEach(([g,name])=>{
     const ds=DOCS.filter(d=>d.g===g); if(!ds.length) return;
@@ -198,14 +204,15 @@ function addMarks(el,id){
 
 // Q-number references → links. Same doc if that question is here, otherwise the question bank.
 function linkQ(el,id){
+  const own=(DOCS.find(x=>x.id===id)||{}).ownq;
   const has=n=>!!el.querySelector('#q-'+n);
   const w=document.createTreeWalker(el,NodeFilter.SHOW_TEXT,{acceptNode:n=>n.parentElement.closest('h3,a,code,pre,textarea,.qbar')?NodeFilter.FILTER_REJECT:(/Q\d{1,3}/.test(n.nodeValue)?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_SKIP)});
   const nodes=[];let n;while(n=w.nextNode())nodes.push(n);
   nodes.forEach(t=>{const f=document.createDocumentFragment();let last=0;
     t.nodeValue.replace(/Q(\d{1,3})(?!\d)/g,(m,num,off)=>{
-      const local=has(num); if(!local&&id==='qbank') return m;
+      const local=has(num), tgt=QMAP[num]; if(!local&&(own||!tgt)) return m;
       f.append(t.nodeValue.slice(last,off));const a=document.createElement('a');a.className='qref';a.textContent=m;
-      a.href=local?`#${id}/q-${num}`:`#qbank/q-${num}`; if(local)a.dataset.local=num; f.append(a);last=off+m.length;return m});
+      a.href=local?`#${id}/q-${num}`:`#${tgt}/q-${num}`; if(local)a.dataset.local=num; f.append(a);last=off+m.length;return m});
     if(last){f.append(t.nodeValue.slice(last));t.replaceWith(f)}});
 }
 let BACK=[];
@@ -232,7 +239,7 @@ $('#toc').onchange=e=>{const v=e.target.value;if(v)document.getElementById(v).sc
 
 // find in doc
 let qt; $('#q').oninput=e=>{clearTimeout(qt);qt=setTimeout(()=>find(e.target.value.trim()),250)};
-$('#q').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();const m=e.target.value.trim().match(/^[qQ]?(\d{1,3})$/);if(m&&jumpTo('q-'+m[1])){e.target.blur();return}nextHit()}};
+$('#q').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();const m=e.target.value.trim().match(/^[qQ]?(\d{1,3})$/);if(m){if(jumpTo('q-'+m[1])){e.target.blur();return}if(QMAP[m[1]]){e.target.blur();location.hash=QMAP[m[1]]+'/q-'+m[1];return}}nextHit()}};
 let hits=[],hi=-1;
 function find(term){
   const art=$('#main .doc'); if(!art) return;
@@ -245,7 +252,7 @@ function find(term){
 function nextHit(){if(!hits.length)return;hi=(hi+1)%hits.length;hits[hi].scrollIntoView({block:'center'})}
 
 // routing
-function route(){const [id,anchor]=location.hash.slice(1).split('/');id?renderDoc(decodeURIComponent(id),anchor):renderHome()}
+function route(){let [id,anchor]=location.hash.slice(1).split('/');if(id==='q'&&anchor){const n=anchor;id=QMAP[n]||'qbank';anchor='q-'+n;history.replaceState(null,'','#'+id+'/'+anchor)}id?renderDoc(decodeURIComponent(id),anchor):renderHome()}
 $('#home').onclick=()=>{location.hash=''};
 addEventListener('hashchange',()=>{if(WEEK)route()});
 let st; addEventListener('scroll',()=>{$('#top').style.display=scrollY>800?'block':'none';clearTimeout(st);st=setTimeout(()=>{const id=location.hash.slice(1).split('/')[0];if(id)store.set('pos:'+id,scrollY)},300)});
@@ -262,7 +269,7 @@ async function decryptWith(raw){
   const key=await crypto.subtle.importKey('raw',raw,'AES-GCM',false,['decrypt']);
   const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64d(e.iv)},key,b64d(e.ct));
   const c=JSON.parse(new TextDecoder().decode(pt));
-  DOCS=c.docs;DECKS=c.decks;WEEK=c.week;MD=c.md;GROUPS=c.groups||[];EXAM=c.exam||null;
+  DOCS=c.docs;DECKS=c.decks;WEEK=c.week;MD=c.md;GROUPS=c.groups||[];EXAM=c.exam||null;QMAP=c.qmap||{};MUST=c.must||[];
 }
 async function deriveRaw(pw){
   const e=await loadEnc();
